@@ -97,6 +97,10 @@ function writeTool() {
         existed = true;
       } catch { /* new file */ }
       await fs.writeFile(abs, input.content, 'utf8');
+      if (ctx.hooks) {
+        const { fireHook } = await import('../ext/hooks.mjs');
+        fireHook(ctx.hooks, 'FileChanged', { path: abs, change: existed ? 'modified' : 'created' }, { cwd: ctx.workspace });
+      }
       const bytes = Buffer.byteLength(input.content, 'utf8');
       const verb = existed ? 'Overwrote' : 'Created';
       return { content: `${verb} ${input.path} (${bytes} bytes, ${input.content.split('\n').length} lines)` };
@@ -152,6 +156,10 @@ function editTool() {
         ? text.split(input.oldString).join(input.newString)
         : text.replace(input.oldString, input.newString);
       await fs.writeFile(abs, next, 'utf8');
+      if (ctx.hooks) {
+        const { fireHook } = await import('../ext/hooks.mjs');
+        fireHook(ctx.hooks, 'FileChanged', { path: abs, change: 'modified' }, { cwd: ctx.workspace });
+      }
       return {
         content: `Edited ${input.path}: replaced ${input.replaceAll ? count : 1} occurrence(s), ` +
           `${text.split('\n').length} → ${next.split('\n').length} lines`,

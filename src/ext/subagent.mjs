@@ -82,6 +82,12 @@ export function subagentTool(deps) {
       });
       const messages = [{ role: 'user', content: [{ type: 'text', text: input.prompt }] }];
 
+      const hooksCfg = deps.getHooks?.();
+      if (hooksCfg) {
+        const { fireHook } = await import('./hooks.mjs');
+        fireHook(hooksCfg, 'SubagentStart', { description: input.description, prompt: input.prompt.slice(0, 200) }, { cwd: deps.workspace });
+      }
+
       const out = await runAgent({
         provider,
         tools,
@@ -93,6 +99,11 @@ export function subagentTool(deps) {
         // deadlock in headless use. Denials come back as tool errors instead.
         onAsk: undefined,
       });
+
+      if (hooksCfg) {
+        const { fireHook } = await import('./hooks.mjs');
+        fireHook(hooksCfg, 'SubagentStop', { stopReason: out.stopReason, turns: out.turns }, { cwd: deps.workspace });
+      }
 
       const report = out.finalText?.trim() || '(the subagent produced no final text)';
       const label = input.description ? ` [${input.description}]` : '';

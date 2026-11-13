@@ -17,7 +17,7 @@
 
 import { estimateMessages, estimateTokens, newId } from './types.mjs';
 import { decide, denialMessage } from '../permissions/gate.mjs';
-import { runHooks } from '../ext/hooks.mjs';
+import { runHooks, fireHook } from '../ext/hooks.mjs';
 import { clipOutput } from '../tools/registry.mjs';
 
 export const STOP = {
@@ -78,6 +78,7 @@ export async function runAgent(opts) {
     // --- context budget check -------------------------------------------
     const projected = estimateMessages(messages) + estimateTokens(system) + 2048;
     if (projected > contextWindow) {
+      if (permissions.hooks) fireHook(permissions.hooks, 'PreCompact', { tokensBefore: projected }, { cwd: permissions.cwd, signal });
       const compacted = compactMessages(messages, Math.floor(contextWindow * 0.6));
       const after = estimateMessages(compacted) + estimateTokens(system) + 2048;
       if (after > contextWindow) {
@@ -89,6 +90,7 @@ export async function runAgent(opts) {
       messages.length = 0;
       messages.push(...compacted);
       onEvent({ type: 'notice', level: 'warn', message: `compacted history to fit the model's ${contextWindow}-token window` });
+      if (permissions.hooks) fireHook(permissions.hooks, 'PostCompact', { tokensBefore: projected, tokensAfter: after }, { cwd: permissions.cwd, signal });
     }
 
     turns++;
@@ -166,6 +168,9 @@ export async function runAgent(opts) {
     // The Stop hook fires when the agent believes it is done, which is the only
     // moment a "you forgot something" hook is useful. It is fire-and-forget:
     // it cannot retroactively deny work that already happened.
+    if (permissions.hooks && stopReason !== STOP.endTurn) {
+      fireHook(permissions.hooks, 'StopFailure', { stopReason, finalText }, { cwd: permissions.cwd, signal });
+    }
     if (permissions.hooks && stopReason === STOP.endTurn) {
       runHooks(permissions.hooks, 'Stop', { stopReason, finalText }, { cwd: permissions.cwd, signal })
         .then((r) => {
@@ -228,7 +233,15 @@ async function executeOne({ call, tools, permissions, onAsk, signal, onEvent }) 
 
   if (decision.behavior === 'deny') {
     onEvent({ type: 'notice', level: 'warn', message: `refused ${call.name}: ${decision.reason}` });
+    if (permissions.hooks) {
+      fireHook(permissions.hooks, 'PermissionDenied', { toolName: call.name, input: effectiveInput, reason: decision.reason }, { cwd: permissions.cwd, signal });
+    }
     return block(call, denialMessage(decision, call.name, permissions.mode), true);
+  }
+
+  if (decision.behavior === 'ask' && permissions.hooks) {
+    fireHook(permissions.hooks, 'PermissionRequest', { toolName: call.name, input: effectiveInput, reason: decision.reason }, { cwd: permissions.cwd, signal });
+    fireHook(permissions.hooks, 'Elicitation', { kind: 'permission', toolName: call.name }, { cwd: permissions.cwd, signal });
   }
 
   if (decision.behavior === 'ask') {
@@ -252,6 +265,9 @@ async function executeOne({ call, tools, permissions, onAsk, signal, onEvent }) 
   } catch (err) {
     // A tool failure is data for the model, not a crash for the session.
     onEvent({ type: 'notice', level: 'warn', message: `${call.name} failed: ${err.message}` });
+    if (permissions.hooks) {
+      fireHook(permissions.hooks, 'PostToolUseFailure', { toolName: call.name, input: effectiveInput, error: err.message }, { cwd: permissions.cwd, signal });
+    }
     return block(call, `${call.name} failed: ${err.message}`, true);
   }
 

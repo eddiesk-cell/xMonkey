@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('xmonkey', {
   pickFiles: () => ipcRenderer.invoke('app:pick-files'),
   openPath: (p) => ipcRenderer.invoke('app:open-path', p),
   answerPermission: (id, approved) => ipcRenderer.invoke('permission:answer', { id, approved }),
+  answerQuestion: (id, answer) => ipcRenderer.invoke('question:answer', { id, answer }),
 
   // ---- events (main -> renderer)
   onEvent: (cb) => {
@@ -45,6 +46,11 @@ contextBridge.exposeInMainWorld('xmonkey', {
     const h = (_e, payload) => cb(payload);
     ipcRenderer.on('permission:ask', h);
     return () => ipcRenderer.removeListener('permission:ask', h);
+  },
+  onQuestionAsk: (cb) => {
+    const h = (_e, payload) => cb(payload);
+    ipcRenderer.on('question:ask', h);
+    return () => ipcRenderer.removeListener('question:ask', h);
   },
   onPermissionExpired: (cb) => {
     const h = (_e, payload) => cb(payload);

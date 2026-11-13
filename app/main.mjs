@@ -277,6 +277,8 @@ function registerIpc() {
           mainWindow?.webContents.send('session:event', event);
         },
         onAsk: (req) => askRenderer(req),
+        onPlan: (plan) => askPlan(plan),
+        onAskQuestion: (q) => askQuestion(q),
       });
       return {
         ok: true,
@@ -340,12 +342,48 @@ function registerIpc() {
 
   // The renderer answers a permission prompt. This is the ONLY path that can
   // approve a mutating tool call, so it is a dedicated channel with a one-shot id.
+  ipcMain.handle('question:answer', (_e, { id, answer }) => {
+    const resolve = pendingApprovals.get(id);
+    if (!resolve) return { ok: false, error: 'unknown or expired question' };
+    pendingApprovals.delete(id);
+    resolve(String(answer ?? ''));
+    return { ok: true };
+  });
+
   ipcMain.handle('permission:answer', (_e, { id, approved }) => {
     const resolve = pendingApprovals.get(id);
     if (!resolve) return { ok: false, error: 'unknown or expired approval request' };
     pendingApprovals.delete(id);
     resolve(!!approved);
     return { ok: true };
+  });
+}
+
+/** Plan approval: reuse the permission channel with a plan-shaped payload. */
+function askPlan(plan) {
+  return new Promise((resolve) => {
+    const id = `plan_${++approvalSeq}`;
+    if (!mainWindow || mainWindow.isDestroyed()) { resolve(false); return; }
+    pendingApprovals.set(id, resolve);
+    mainWindow.webContents.send('permission:ask', {
+      id, tool: 'plan', reason: 'Approve this plan?', input: { plan },
+    });
+    setTimeout(() => {
+      if (pendingApprovals.has(id)) { pendingApprovals.delete(id); resolve(false); }
+    }, 5 * 60_000).unref?.();
+  });
+}
+
+/** A free-form question from ask_user. The renderer returns a string. */
+function askQuestion(q) {
+  return new Promise((resolve) => {
+    const id = `q_${++approvalSeq}`;
+    if (!mainWindow || mainWindow.isDestroyed()) { resolve('(no user available)'); return; }
+    pendingApprovals.set(id, resolve);
+    mainWindow.webContents.send('question:ask', { id, ...q });
+    setTimeout(() => {
+      if (pendingApprovals.has(id)) { pendingApprovals.delete(id); resolve('(the user did not answer)'); }
+    }, 10 * 60_000).unref?.();
   });
 }
 

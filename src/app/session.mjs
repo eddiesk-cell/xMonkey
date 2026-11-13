@@ -22,7 +22,7 @@ import { SessionStore } from '../sessions/store.mjs';
 import { MODES } from '../permissions/gate.mjs';
 import { loadSkills, renderSkillCatalogue, skillTool } from '../ext/skills.mjs';
 import { connectMcpServers } from '../ext/mcp.mjs';
-import { runHooks, hasHooks } from '../ext/hooks.mjs';
+import { runHooks, fireHook, hasHooks } from '../ext/hooks.mjs';
 import { subagentTool } from '../ext/subagent.mjs';
 import { describeConfig } from '../config.mjs';
 
@@ -81,7 +81,18 @@ export async function createSession(opts = {}) {
 
   // ---- tools + extensions -------------------------------------------------
   const todos = createTodoStore();
-  const toolCtx = { workspace: cwd, todos, maxToolChars: 30_000, allowOutsideWorkspace: !!opts.allowOutside };
+  // Hooks are called from tools too (FileChanged, TaskCreated), so the tool
+  // context carries them rather than every tool taking a second argument.
+  const toolCtx = {
+    workspace: cwd, todos, maxToolChars: 30_000,
+    allowOutsideWorkspace: !!opts.allowOutside,
+    hooks: cfg.hooks && hasHooks(cfg.hooks) ? cfg.hooks : undefined,
+    webConfig: cfg.webSearch ? { webSearch: cfg.webSearch } : {},
+    // The plan tool and ask_user reach the UI through these; when the caller
+    // supplies no handler they degrade honestly instead of hanging.
+    onPlan: opts.onPlan,
+    onAsk: opts.onAskQuestion,
+  };
   const tools = buildDefaultRegistry(toolCtx);
 
   const skills = await loadSkills(cwd);
@@ -104,7 +115,8 @@ export async function createSession(opts = {}) {
   // auto-detected models and keeps the child on the same model family.
   tools.register(subagentTool({
     getProvider: () => buildProvider({ ...entry, apiKey: opts.apiKey || entry.apiKey }),
-    getTools: () => buildDefaultRegistry({ workspace: cwd, todos: createTodoStore(), maxToolChars: 20_000 }),
+    getTools: () => buildDefaultRegistry({ ...toolCtx, todos: createTodoStore() }),
+    getHooks: () => toolCtx.hooks,
     workspace: cwd,
   }));
 
@@ -112,6 +124,21 @@ export async function createSession(opts = {}) {
 
   // ---- memory + prompt ----------------------------------------------------
   const memory = await loadMemory(cwd);
+  if (hooks) fireHook(hooks, 'InstructionsLoaded', { cwd, files: memory.map((m) => m.path) }, { cwd });
+  // SessionStart runs BEFORE the prompt is assembled: a hook may inject context
+  // (Claude Code's `additionalContext`), and that context has to land in the
+  // system prompt, not arrive after it has already been built.
+  let hookContext = '';
+  if (hooks) {
+    // `store` is created a few lines below; Setup only needs the workspace.
+    fireHook(hooks, 'Setup', { cwd }, { cwd });
+    const startResult = await runHooks(hooks, 'SessionStart', { cwd }, { cwd });
+    hookContext = (startResult.results ?? [])
+      .map((r) => r.additionalContext)
+      .filter(Boolean)
+      .join('\n');
+  }
+
   const local = LOCAL_KINDS.has(entry.kind) || isLocalUrl(entry.baseUrl);
   const system = buildSystemPrompt({
     cwd,
@@ -120,7 +147,7 @@ export async function createSession(opts = {}) {
     permissionMode: mode,
     toolNames: tools.names(),
     memory: memory.map((m) => `### ${m.path}\n${m.text}`).join('\n\n'),
-    extra: renderSkillCatalogue(skills) || undefined,
+    extra: [renderSkillCatalogue(skills), hookContext].filter(Boolean).join('\n\n') || undefined,
     local,
   });
 
@@ -139,7 +166,6 @@ export async function createSession(opts = {}) {
   let aborter = null;
   const onEvent = opts.onEvent ?? (() => {});
 
-  if (hooks) await runHooks(hooks, 'SessionStart', { sessionId: store.id, cwd }, { cwd });
 
   const session = {
     id: store.id,
@@ -166,6 +192,18 @@ export async function createSession(opts = {}) {
       busy = true;
       aborter = new AbortController();
       const persistFrom = history.length;
+
+      // UserPromptSubmit may rewrite or reject the prompt before it is sent.
+      if (hooks) {
+        const submitted = await runHooks(hooks, 'UserPromptSubmit', { prompt, cwd }, { cwd, signal: aborter.signal });
+        if (submitted.decision === 'deny') {
+          busy = false;
+          aborter = null;
+          onEvent({ type: 'turn_error', message: `a UserPromptSubmit hook rejected this prompt: ${submitted.reason ?? 'no reason given'}` });
+          return { stopReason: 'blocked', turns: 0, usage: {}, finalText: '' };
+        }
+        if (submitted.updatedInput?.prompt) prompt = String(submitted.updatedInput.prompt);
+      }
       try {
         history.push({ role: 'user', content: [{ type: 'text', text: prompt }] });
         onEvent({ type: 'user', text: prompt });
@@ -201,6 +239,11 @@ export async function createSession(opts = {}) {
 
     abort(reason = 'interrupted by user') {
       if (aborter) aborter.abort(new Error(reason));
+    },
+
+    /** Fire a lifecycle event the UI/loop reached (Notification, CwdChanged, …). */
+    notify(event, payload = {}) {
+      if (hooks) fireHook(hooks, event, { sessionId: store.id, cwd, ...payload }, { cwd });
     },
 
     async close() {

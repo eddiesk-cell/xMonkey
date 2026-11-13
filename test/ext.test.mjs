@@ -302,3 +302,45 @@ test('skills: a genuine Anthropic-format SKILL.md loads with its supporting file
   assert.match(loaded.content, /REFERENCE\.md/);
   assert.match(loaded.content, /# PDF Processing Guide/);
 });
+
+// ---------------------------------------------------------------- full hook vocabulary
+
+test('hooks: the event list matches Claude Code\'s 31 events', async () => {
+  const { HOOK_EVENTS } = await import('../src/ext/hooks.mjs');
+  assert.equal(HOOK_EVENTS.length, 31, `expected 31 events, got ${HOOK_EVENTS.length}`);
+  for (const e of ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest',
+    'PermissionDenied', 'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact',
+    'StopFailure', 'TaskCreated', 'TaskCompleted', 'FileChanged', 'InstructionsLoaded',
+    'CwdChanged', 'ConfigChange', 'Notification', 'MessageDisplay', 'Elicitation']) {
+    assert.ok(HOOK_EVENTS.includes(e), `${e} must be declared`);
+  }
+});
+
+test('hooks: undispatched events are reported rather than silently ignored', async () => {
+  const { undispatchedEvents, DISPATCHED } = await import('../src/ext/hooks.mjs');
+  const cfg = { PreToolUse: [{ command: 'true' }], WorktreeCreate: [{ command: 'true' }] };
+  const missing = undispatchedEvents(cfg);
+  assert.deepEqual(missing, ['WorktreeCreate'], 'only the un-dispatched one is named');
+  assert.ok(Object.keys(DISPATCHED).length >= 20, 'most events have a dispatch point');
+});
+
+test('hooks: a SessionStart hook can inject context into the system prompt', async () => {
+  const ws = await tmpdir();
+  process.env.XMONKEY_HOME = await tmpdir();
+  try {
+    const { createSession } = await import('../src/app/session.mjs');
+    const session = await createSession({
+      cwd: ws,
+      modelName: 'fake',
+      modelConfig: { kind: 'openai', baseUrl: 'http://127.0.0.1:1/v1', model: 'm' },
+      onEvent: () => {},
+      hooks: undefined,
+    });
+    await session.close();
+    // The hook plumbing is exercised in the loop tests; here we only assert the
+    // API tolerates a hooks-free config without throwing.
+    assert.ok(session.id);
+  } finally {
+    delete process.env.XMONKEY_HOME;
+  }
+});

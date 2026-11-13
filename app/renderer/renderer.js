@@ -72,6 +72,7 @@ async function boot() {
   api.onSchedulerEvent?.(() => { if (ui.view === 'scheduled') renderScheduled(); });
   api.onEvent(handleEvent);
   api.onPermissionAsk(showPermission);
+  api.onQuestionAsk?.(showQuestion);
   api.onPermissionExpired(() => { if (ui.pendingPerm) closePermission(false); });
 
   renderRecents();
@@ -1175,6 +1176,44 @@ async function closePermission(approved) {
   ui.pendingPerm = null;
   $('perm').classList.add('hidden');
   await api.answerPermission(req.id, approved);
+}
+
+// ---------------------------------------------------------------- questions
+
+let pendingQuestion = null;
+
+function showQuestion(q) {
+  pendingQuestion = q;
+  $('question-text').textContent = q.question ?? '';
+  const box = $('question-options');
+  box.innerHTML = '';
+  for (const opt of q.options ?? []) {
+    const b = document.createElement('button');
+    b.className = 'question-opt';
+    b.innerHTML = '<span class="label"></span><span class="desc"></span>';
+    b.querySelector('.label').textContent = opt.label;
+    b.querySelector('.desc').textContent = opt.description ?? '';
+    b.onclick = () => answerQuestion(opt.label);
+    box.appendChild(b);
+  }
+  $('question-input').value = '';
+  $('question').classList.remove('hidden');
+  $('question-input').focus();
+  $('question-submit').onclick = () => {
+    const typed = $('question-input').value.trim();
+    answerQuestion(typed || (q.options?.[0]?.label ?? ''));
+  };
+  $('question-input').onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); $('question-submit').click(); }
+  };
+}
+
+async function answerQuestion(text) {
+  const q = pendingQuestion;
+  if (!q) return;
+  pendingQuestion = null;
+  $('question').classList.add('hidden');
+  await api.answerQuestion(q.id, text);
 }
 
 // ---------------------------------------------------------------- pickers

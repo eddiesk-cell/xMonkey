@@ -995,3 +995,28 @@ body.sb-collapsed .screen { grid-column: 1 / -1; }
 }
 .row-menu button:hover { background: var(--surface-2); }
 .row-menu button.danger { color: var(--err); }
+
+/* ---------------------------------------------------------------- question */
+.question-options { display: grid; gap: .375rem; margin-bottom: .625rem; }
+.question-opt {
+  text-align: left;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  font-size: .875rem;
+  color: var(--text-primary);
+}
+.question-opt:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.question-opt .desc { display: block; font-size: .75rem; color: var(--text-tertiary); margin-top: .125rem; }
+#question-input {
+  width: 100%;
+  padding: .5rem .625rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-line);
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font: var(--prose-size) var(--sans);
+  outline: none;
+}
+#question-input:focus { border-color: var(--border-strong); }
