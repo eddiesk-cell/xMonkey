@@ -8,8 +8,9 @@
     "qwen-uncensored": {
       "kind": "ollama",
       "baseUrl": "http://127.0.0.1:11434",
-      "model": "huihui_ai/qwen3.8-27b-abliterated",
-      "contextWindow": 32768
+      "model": "qwen3.8-27b-abliterated",
+      "contextWindow": 32768,
+      "maxTokens": 4096
     },
     "deepseek-flash": {
       "kind": "deepseek",
@@ -30,11 +31,22 @@
   "permissions": {
     "mode": "default",
     "rules": [
-      { "tool": "bash", "pattern": "^git (status|diff|log|show)", "action": "allow" },
-      { "tool": "bash", "field": "command", "pattern": "^rm -rf /", "action": "deny" }
+      {
+        "tool": "bash",
+        "pattern": "^git (status|diff|log|show)",
+        "action": "allow"
+      },
+      {
+        "tool": "bash",
+        "field": "command",
+        "pattern": "^rm -rf /",
+        "action": "deny"
+      }
     ]
   },
-  "loop": { "maxTurns": 60 },
+  "loop": {
+    "maxTurns": 60
+  },
   "mcpServers": {},
   "hooks": {}
 }

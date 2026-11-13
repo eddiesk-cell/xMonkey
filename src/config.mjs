@@ -17,10 +17,53 @@ import path from 'node:path';
 import { probe } from './models/ollama.mjs';
 import { probe as probeOpenAI } from './models/openai.mjs';
 
-export const DEFAULT_CONFIG_PATHS = (cwd = process.cwd()) => [
-  path.join(cwd, 'xmonkey.config.json'),
-  path.join(os.homedir(), '.config', 'xmonkey', 'config.json'),
-];
+/**
+ * Where configuration is looked up, in increasing precedence:
+ *   1. ~/.config/xmonkey/config.json       personal defaults, always available
+ *   2. <cwd>/xmonkey.config.json           the project's own config
+ *   3. every ancestor of cwd up to the repo root or home, nearest last
+ *
+ * Walking up matters: a user configures models once (say in their home dir) and
+ * then runs xMonkey inside any project; without the ancestor walk, `-m <model>`
+ * fails in every subdirectory.
+ */
+/**
+ * Config search paths, ordered LEAST specific first so that applying them in
+ * order (later wins) gives the right precedence:
+ *   1. ~/.config/xmonkey/config.json          personal defaults
+ *   2. xmonkey.config.json in each ancestor of cwd, outermost first
+ *   3. xmonkey.config.json in cwd itself      the project's own config
+ *
+ * Walking the ancestors matters: a user configures models once and then runs
+ * xMonkey inside any project or subdirectory. The chain is built explicitly
+ * rather than with unshift(), because an off-by-one in that ordering silently
+ * inverts precedence — a project file loses to the user's file.
+ */
+export const DEFAULT_CONFIG_PATHS = (cwd = process.cwd()) => {
+  // Explicit override wins outright (CI, sandboxes with a redirected HOME).
+  const explicit = process.env.XMONKEY_CONFIG;
+  if (explicit) return [path.resolve(explicit)];
+
+  const home = os.homedir();
+  const userConfig = path.join(home, '.config', 'xmonkey', 'config.json');
+  const paths = [userConfig];
+
+  const start = path.resolve(cwd);
+  const ancestors = [];
+  let dir = path.dirname(start);
+  for (let i = 0; i < 16; i++) {
+    ancestors.push(dir);                       // outermost -> innermost
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  for (const d of ancestors.reverse()) {
+    const p = path.join(d, 'xmonkey.config.json');
+    if (p !== userConfig) paths.push(p);
+  }
+  paths.push(path.join(start, 'xmonkey.config.json'));
+  return paths;
+};
 
 /**
  * The default roster. `deepseek-flash` and `deepseek-pro` read the key from
@@ -33,7 +76,7 @@ export const EXAMPLE_CONFIG = {
     'qwen-uncensored': {
       kind: 'ollama',
       baseUrl: 'http://127.0.0.1:11434',
-      model: 'huihui_ai/qwen3.8-27b-abliterated',
+      model: 'qwen3.8-27b-abliterated',
       contextWindow: 32768,
     },
     'deepseek-flash': {
@@ -123,10 +166,11 @@ export async function loadConfig({ cwd = process.cwd(), flags = {} } = {}) {
     sources: configs.map((c) => c.path),
   };
 
-  // `configs` arrives [project, user]. Applying it REVERSED (user, then project)
-  // means the project file is merged last and wins per key. Each section is
-  // shallow-merged so a project can override one key without dropping the rest.
-  for (const { data } of [...configs].reverse()) {
+  // DEFAULT_CONFIG_PATHS already returns least-specific-first, so applying in
+  // ARRIVAL order means the project file is merged last and wins per key. Each
+  // section is shallow-merged so a project can override one key without dropping
+  // the rest of the user's config. (Reversing here as well would re-invert it.)
+  for (const { data } of configs) {
     Object.assign(merged.models, data.models || {});
     if (data.default) merged.default = data.default;
     if (data.permissions) merged.permissions = { ...merged.permissions, ...data.permissions };
