@@ -73,6 +73,8 @@ export async function createSession(opts = {}) {
     throw new Error(`unknown model "${selected}". Configured: ${Object.keys(cfg.models).join(', ') || '(none)'}`);
   }
 
+  // loadConfig already merged a key from DEEPSEEK_API_KEY / the auth file into
+  // `entry.apiKey`, so the GUI gets credentials without any extra plumbing.
   const provider = buildProvider({ ...entry, apiKey: opts.apiKey || entry.apiKey });
   const mode = opts.autoApprove ? 'bypass' : (opts.mode || cfg.permissions.mode || 'default');
   if (!MODES.includes(mode)) throw new Error(`unknown permission mode "${mode}"`);

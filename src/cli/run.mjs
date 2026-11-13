@@ -65,12 +65,18 @@ USAGE
   xmonkey "fix the failing test"   start with a first message
   xmonkey -p "what does src/cli do?"   one-shot, print answer, exit
 
+FIRST RUN
+  setup                       store API keys in ~/.xmonkey/auth.json (0600) and
+                              print how to pull the local uncensored model
+
 MODEL SELECTION
   -m, --model <name>          model alias from config (or kind/model spec)
   --kind <kind>               provider kind: anthropic|openai|ollama|lmstudio|vllm
   --base-url <url>            endpoint for the provider
   --api-key <key>             API key (or use ANTHROPIC_API_KEY / OPENAI_API_KEY)
   --list-models               show configured models and whether they are reachable
+  --kind deepseek             DeepSeek API (Flash = deepseek-v4-flash,
+                              Pro = deepseek-v4-pro)
   doctor                      probe every configured model endpoint
 
 PERMISSIONS
@@ -102,6 +108,7 @@ export async function main(argv) {
   if (flags.help || cmd === 'help') { process.stdout.write(HELP); return 0; }
   if (flags.version || cmd === 'version') { process.stdout.write(`xmonkey ${VERSION}\n`); return 0; }
   if (flags.init || cmd === 'init') return initConfig();
+  if (cmd === 'setup') return runSetup(flags);
 
   const cfg = await loadConfig({ cwd: process.cwd(), flags });
 
@@ -311,6 +318,69 @@ async function initConfig() {
   await fs.writeFile(target, JSON.stringify(EXAMPLE_CONFIG, null, 2) + '\n', 'utf8');
   process.stdout.write(`${symbols.ok} wrote ${c.bold('xmonkey.config.json')}\n\n`);
   process.stdout.write(`Next: start a local model with Ollama (\`ollama pull qwen2.5-coder:7b\`) or set an API key,\nthen run \`xmonkey\`.\n`);
+  return 0;
+}
+
+/**
+ * Interactive credential + model setup.
+ * Keys are typed at a hidden prompt, written to ~/.xmonkey/auth.json (0600), and
+ * never touch the project config or the shell history.
+ */
+async function runSetup(flags) {
+  const readline = await import('node:readline');
+  const { saveAuth, loadAuth } = await import('../config.mjs');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+
+  const ask = (q) => new Promise((res) => rl.question(q, res));
+  const askHidden = (q) => new Promise((res) => {
+    const onData = (char) => {
+      if (['\n', '\r', '\u0004'].includes(char)) {
+        process.stdin.removeListener('data', onData);
+        process.stdin.setRawMode?.(false);
+        process.stdout.write('\n');
+        res(buf);
+      } else if (char === '\u0003') {
+        process.exit(1);
+      } else if (char === '\u007f') {
+        buf = buf.slice(0, -1);
+      } else {
+        buf += char;
+      }
+    };
+    let buf = '';
+    process.stdin.setRawMode?.(true);
+    process.stdin.resume();
+    process.stdin.on('data', onData);
+    process.stdout.write(q);
+  });
+
+  process.stdout.write(`${c.bold('xMonkey setup')}\n\n`);
+  const auth = await loadAuth();
+
+  process.stdout.write('DeepSeek API key (Flash + Pro models). Leave empty to skip.\n');
+  process.stdout.write(c.grey('  Get one at https://platform.deepseek.com/api_keys\n'));
+  const deepseek = (await askHidden('  key: ')).trim();
+  if (deepseek) {
+    auth.deepseek = deepseek;
+    process.stdout.write(`  ${symbols.ok} DeepSeek key saved\n`);
+  }
+
+  if (await ask(`Add an Anthropic key too? [y/N] `).then((a) => /^y/i.test(a.trim()))) {
+    const k = (await askHidden('  key: ')).trim();
+    if (k) { auth.anthropic = k; process.stdout.write(`  ${symbols.ok} Anthropic key saved\n`); }
+  }
+
+  const where = await saveAuth(auth);
+  rl.close();
+  process.stdout.write(`\n${symbols.ok} credentials written to ${where} (0600)\n`);
+  process.stdout.write(`\nNext:\n`);
+  process.stdout.write(`  xmonkey --list-models          # confirm the roster\n`);
+  process.stdout.write(`  xmonkey doctor                 # verify each endpoint answers\n`);
+  process.stdout.write(`  xmonkey -m deepseek-flash      # use Flash\n`);
+  process.stdout.write(`  xmonkey -m deepseek-pro        # use Pro\n`);
+  process.stdout.write(`\nLocal uncensored model:\n`);
+  process.stdout.write(`  ollama pull huihui_ai/qwen3.8-27b-abliterated\n`);
+  process.stdout.write(`  xmonkey -m qwen-uncensored\n`);
   return 0;
 }
 

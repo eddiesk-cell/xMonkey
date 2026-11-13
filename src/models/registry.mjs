@@ -19,8 +19,10 @@ const ADAPTERS = {
   'llama.cpp': openai,
   vllm: openai,
   openrouter: openai,
-  deepseek: openai,
   groq: openai,
+  // DeepSeek exposes an OpenAI-compatible API; this alias documents intent and
+  // gives `doctor` the right endpoint to probe.
+  deepseek: openai,
 };
 
 export const ADAPTER_IDS = Object.keys(ADAPTERS);

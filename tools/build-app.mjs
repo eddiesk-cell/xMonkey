@@ -71,6 +71,9 @@ const appDir = path.join(res, 'app');
 fs.mkdirSync(appDir, { recursive: true });
 
 const INCLUDE = ['app', 'src', 'bin', 'package.json', 'LICENSE', 'README.md'];
+// app/assets/fonts is git-ignored (Anthropic's proprietary faces) but MUST be in
+// the bundle, or the UI silently falls back to Georgia and stops matching.
+const FONT_DIR = path.join(ROOT, 'app', 'assets', 'fonts');
 for (const item of INCLUDE) {
   const from = path.join(ROOT, item);
   if (!fs.existsSync(from)) continue;
@@ -78,6 +81,12 @@ for (const item of INCLUDE) {
     recursive: true,
     filter: (src) => !src.includes(`${path.sep}node_modules${path.sep}`) && !src.endsWith('.DS_Store'),
   });
+}
+
+if (!fs.existsSync(FONT_DIR) || fs.readdirSync(FONT_DIR).filter((f) => f.endsWith('.woff2')).length === 0) {
+  console.warn('! app/assets/fonts is empty — the UI will fall back to system serif/sans.');
+  console.warn('  Copy the Anthropic variable fonts from the Claude Desktop extraction:');
+  console.warn('  see docs/FONTS.md');
 }
 
 // The bundle's package.json must point at the Electron entry, and must NOT list

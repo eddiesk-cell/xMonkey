@@ -35,6 +35,8 @@ let session = null;
 // --smoke[=out.png]: launch, wait for the renderer to become ready, screenshot,
 // exit. This exists so the UI can be verified by looking at it (and in CI)
 // instead of being assumed to work because the process started.
+let scheduler = null;
+
 const SMOKE = process.argv.find((a) => a.startsWith('--smoke'));
 const SMOKE_OUT = SMOKE?.includes('=') ? SMOKE.split('=')[1].split('&')[0] : '/tmp/xmonkey-smoke.png';
 // `--smoke=out.png&ask=...` also drives one real turn before the screenshot, so
@@ -45,6 +47,8 @@ const SMOKE_AUTO = SMOKE?.includes('&auto') ?? false;
 const SMOKE_CWD = SMOKE?.includes('&cwd=') ? decodeURIComponent(SMOKE.split('&cwd=')[1].split('&')[0]) : null;
 // `&perm` keeps the approval dialog on screen for the screenshot, then allows it.
 const SMOKE_PERM = SMOKE?.includes('&perm') ?? false;
+// `&views` exercises the auxiliary panels (projects/skills/connectors).
+const SMOKE_VIEWS = SMOKE?.includes('&views') ?? false;
 // `&deny` answers the approval dialog with Deny, to prove the refusal path.
 const SMOKE_DENY = SMOKE?.includes('&deny') ?? false;
 /** Pending permission prompts: id -> resolve */
@@ -186,6 +190,19 @@ function registerIpc() {
 
   ipcMain.handle('app:open-path', (_e, p) => { shell.openPath(String(p)); });
 
+  // Attachments: return the chosen file paths, not their contents. The agent
+  // reads them with its own tools when it needs them, which keeps a large file
+  // out of the context window until it is actually relevant.
+  ipcMain.handle('app:pick-files', async () => {
+    if (!mainWindow) return [];
+    const r = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      title: 'Attach files for xMonkey',
+    });
+    if (r.canceled) return [];
+    return r.filePaths.map((p) => ({ path: p, name: path.basename(p) }));
+  });
+
   // Probe configured models + find a local runtime.
   ipcMain.handle('models:probe', async (_e, cwd) => {
     const { probeModels } = await mod('src/app/session.mjs');
@@ -202,6 +219,25 @@ function registerIpc() {
       return { ok: true, sessions: await recentSessions(15) };
     } catch (err) {
       return { ok: false, error: err.message, sessions: [] };
+    }
+  });
+
+  // Deleting a conversation removes its transcript directory. It is a real
+  // delete, so the renderer confirms first; the main process refuses a path that
+  // is not inside the sessions root.
+  ipcMain.handle('sessions:delete', async (_e, id) => {
+    try {
+      const base = process.env.XMONKEY_HOME
+        ? path.join(process.env.XMONKEY_HOME, 'sessions')
+        : path.join(app.getPath('home'), '.xmonkey', 'sessions');
+      const target = path.resolve(base, String(id));
+      if (!target.startsWith(path.resolve(base) + path.sep)) {
+        return { ok: false, error: 'refused: session id escapes the sessions directory' };
+      }
+      await fs.rm(target, { recursive: true, force: true });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
     }
   });
 
@@ -274,6 +310,24 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // ---- scheduled tasks
+  ipcMain.handle('schedules:list', async () => {
+    try { return { ok: true, schedules: scheduler?.list() ?? [] }; }
+    catch (err) { return { ok: false, error: err.message, schedules: [] }; }
+  });
+  ipcMain.handle('schedules:create', async (_e, spec) => {
+    try { return { ok: true, schedule: await scheduler.upsert(spec) }; }
+    catch (err) { return { ok: false, error: err.message }; }
+  });
+  ipcMain.handle('schedules:remove', async (_e, id) => {
+    try { await scheduler.remove(id); return { ok: true }; }
+    catch (err) { return { ok: false, error: err.message }; }
+  });
+  ipcMain.handle('schedules:toggle', async (_e, { id, enabled }) => {
+    try { await scheduler.setEnabled(id, enabled); return { ok: true }; }
+    catch (err) { return { ok: false, error: err.message }; }
+  });
+
   // The renderer answers a permission prompt. This is the ONLY path that can
   // approve a mutating tool call, so it is a dedicated channel with a one-shot id.
   ipcMain.handle('permission:answer', (_e, { id, approved }) => {
@@ -307,6 +361,24 @@ function askRenderer(req) {
   });
 }
 
+// ---------------------------------------------------------------- scheduler
+
+async function startScheduler() {
+  try {
+    const { Scheduler } = await import(path.join(RES, 'src/app/scheduler.mjs'));
+    scheduler = await new Scheduler({
+      createSession: async (opts) => {
+        const { createSession } = await import(path.join(RES, 'src/app/session.mjs'));
+        return createSession({ ...opts, onEvent: () => {} });
+      },
+      onEvent: (e) => mainWindow?.webContents.send('scheduler:event', e),
+    }).start();
+    console.log('[scheduler] started');
+  } catch (err) {
+    console.error('[scheduler] failed to start:', err.message);
+  }
+}
+
 // ---------------------------------------------------------------- lifecycle
 
 app.whenReady().then(() => {
@@ -314,6 +386,7 @@ app.whenReady().then(() => {
   registerIpc();
   buildMenu();
   createWindow();
+  startScheduler();
   if (SMOKE) runSmoke();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -397,6 +470,45 @@ async function runSmoke() {
         await wait(1500);
       }
     }
+    if (SMOKE_ASK || SMOKE_VIEWS) {
+      // Exercise the auxiliary views: a panel that throws is a broken feature.
+      const viewReports = {};
+      for (const v of ['projects', 'skills', 'connectors']) {
+        try {
+          await mainWindow.webContents.executeJavaScript(
+            `document.querySelector('.sb-nav-item[data-view="${v}"]').click()`);
+          await wait(700);
+          viewReports[v] = await mainWindow.webContents.executeJavaScript(
+            `(() => { const el = document.getElementById('view-${v}'); return el && !el.classList.contains('hidden') ? document.getElementById('${v}-body').innerText.slice(0,80) : 'NOT SHOWN'; })()`);
+        } catch (err) {
+          viewReports[v] = 'ERROR: ' + err.message;
+        }
+      }
+      await mainWindow.webContents.executeJavaScript(
+        `document.querySelector('.sb-nav-item[data-view="chat"]').click()`);
+      console.log('[smoke] views', JSON.stringify(viewReports));
+
+
+    }
+
+    const viewState = await mainWindow.webContents.executeJavaScript(`(() => {
+      const t = document.getElementById('thread');
+      const cs = getComputedStyle(t);
+      return {
+        active: [...document.querySelectorAll('.sb-nav-item')].filter(e => e.classList.contains('active')).map(e => e.dataset.view),
+        hidden: [...document.querySelectorAll('.view')].map(e => e.id + ':' + (e.classList.contains('hidden') ? 'hidden' : 'SHOWN')),
+        threadDisplay: cs.display,
+        threadHeight: Math.round(t.getBoundingClientRect().height),
+        threadChildren: t.children.length,
+        threadEmptyClass: t.classList.contains('empty'),
+        welcomeDisplay: getComputedStyle(document.getElementById('welcome')).display,
+      };
+    })()`);
+    console.log('[smoke] viewstate', JSON.stringify(viewState));
+
+    // The view switches above repaint asynchronously; give the compositor a
+    // frame or two, or capturePage can hand back the previous surface.
+    await wait(900);
     const image = await mainWindow.webContents.capturePage();
     const png = image.toPNG();
     await fs.writeFile(SMOKE_OUT, png);
@@ -441,5 +553,6 @@ app.on('window-all-closed', async () => {
 });
 
 app.on('before-quit', async () => {
+  scheduler?.stop();
   if (session) await session.close().catch(() => {});
 });

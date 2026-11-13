@@ -22,13 +22,31 @@ export const DEFAULT_CONFIG_PATHS = (cwd = process.cwd()) => [
   path.join(os.homedir(), '.config', 'xmonkey', 'config.json'),
 ];
 
-/** A config file that works with zero setup: the local model you already have. */
+/**
+ * The default roster. `deepseek-flash` and `deepseek-pro` read the key from
+ * DEEPSEEK_API_KEY or ~/.xmonkey/auth.json (written by `xmonkey setup`); the
+ * key is never stored in this file, which is committed with the project.
+ */
 export const EXAMPLE_CONFIG = {
   models: {
     local: { kind: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'qwen2.5-coder:7b' },
-    lmstudio: { kind: 'lmstudio', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local-model' },
-    sonnet: { kind: 'anthropic', model: 'claude-sonnet-4-5' },
-    gpt: { kind: 'openai', model: 'gpt-4o-mini' },
+    'qwen-uncensored': {
+      kind: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'huihui_ai/qwen3.8-27b-abliterated',
+      contextWindow: 32768,
+    },
+    'deepseek-flash': {
+      kind: 'deepseek',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-v4-flash',
+    },
+    'deepseek-pro': {
+      kind: 'deepseek',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-v4-pro',
+    },
+    anthropic: { kind: 'anthropic', model: 'claude-sonnet-4-5' },
   },
   default: 'local',
   permissions: {
@@ -47,6 +65,31 @@ function mergeHooks(base = {}, add = {}) {
     out[event] = [...(out[event] ?? []), ...(Array.isArray(list) ? list : [list])];
   }
   return out;
+}
+
+/**
+ * Read the local credential file written by `xmonkey setup`.
+ * Shape: { "deepseek": "...", "anthropic": "...", "openai": "..." }
+ * It lives in ~/.xmonkey/auth.json with 0600 permissions, never in the repo.
+ */
+export async function loadAuth() {
+  const p = process.env.XMONKEY_AUTH_FILE
+    || path.join(process.env.XMONKEY_HOME || path.join(os.homedir(), '.xmonkey'), 'auth.json');
+  try {
+    const raw = await fs.readFile(p, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveAuth(auth) {
+  const dir = process.env.XMONKEY_HOME || path.join(os.homedir(), '.xmonkey');
+  await fs.mkdir(dir, { recursive: true });
+  const p = path.join(dir, 'auth.json');
+  await fs.writeFile(p, JSON.stringify(auth, null, 2), { encoding: 'utf8', mode: 0o600 });
+  await fs.chmod(p, 0o600);
+  return p;
 }
 
 export async function loadConfig({ cwd = process.cwd(), flags = {} } = {}) {
@@ -90,6 +133,18 @@ export async function loadConfig({ cwd = process.cwd(), flags = {} } = {}) {
     if (data.loop) merged.loop = { ...merged.loop, ...data.loop };
     if (data.mcpServers) merged.mcpServers = { ...(merged.mcpServers || {}), ...data.mcpServers };
     if (data.hooks) merged.hooks = mergeHooks(merged.hooks, data.hooks);
+  }
+
+  // Attach credentials from the environment or the local auth file. A key never
+  // has to appear in a committed config file.
+  const auth = await loadAuth();
+  for (const [name, entry] of Object.entries(merged.models)) {
+    const kind = entry.kind;
+    const envKey = kind === 'deepseek' ? process.env.DEEPSEEK_API_KEY
+      : kind === 'anthropic' ? (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
+      : (process.env.OPENAI_API_KEY);
+    const fileKey = auth[kind] || auth[name];
+    if (!entry.apiKey && (envKey || fileKey)) entry.apiKey = envKey || fileKey;
   }
 
   // Pick the model before flags, so we can tell "the user named a real model"

@@ -8,6 +8,18 @@
 .rea/
 research/claude-code/cli.js
 
+# Anthropic's proprietary variable fonts, copied locally from the installed
+# Claude Desktop bundle so the UI can match exactly. NEVER commit these.
+app/assets/fonts/
+*.woff2
+
+# Credentials: never commit a key. `xmonkey setup` writes ~/.xmonkey/auth.json
+# (outside the repo); these guards cover the cases where it might be copied in.
+auth.json
+.env
+*.key
+*.pem
+
 # Not committed:
 #   node_modules/  Electron runtime (~260 MB), installed with `npm install`
 #   dist/          the built .app (~260 MB), built with `npm run app:build`
@@ -16,3 +28,6 @@ node_modules/
 dist/
 .xmonkey/
 .DS_Store
+
+# Local model weights (GGUFs pulled for Ollama) — large, not part of the repo.
+.models/

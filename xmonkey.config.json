@@ -1,0 +1,40 @@
+{
+  "models": {
+    "local": {
+      "kind": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "model": "gemma4:12b-it-qat"
+    },
+    "qwen-uncensored": {
+      "kind": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "model": "huihui_ai/qwen3.8-27b-abliterated",
+      "contextWindow": 32768
+    },
+    "deepseek-flash": {
+      "kind": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "model": "deepseek-v4-flash",
+      "contextWindow": 1000000,
+      "maxTokens": 8192
+    },
+    "deepseek-pro": {
+      "kind": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "model": "deepseek-v4-pro",
+      "contextWindow": 1000000,
+      "maxTokens": 16384
+    }
+  },
+  "default": "local",
+  "permissions": {
+    "mode": "default",
+    "rules": [
+      { "tool": "bash", "pattern": "^git (status|diff|log|show)", "action": "allow" },
+      { "tool": "bash", "field": "command", "pattern": "^rm -rf /", "action": "deny" }
+    ]
+  },
+  "loop": { "maxTurns": 60 },
+  "mcpServers": {},
+  "hooks": {}
+}
