@@ -18,7 +18,11 @@ Ollama model running on this machine. Ships as **both** a CLI and a desktop app.
 ## Two ways to run it
 
 <p align="center">
-  <img src="docs/images/app-conversation.png" alt="xMonkey desktop app running a real task on a local model" width="820">
+  <img src="docs/images/app-start.png" alt="xMonkey start screen: sidebar, model, and a detected local model ready to start" width="840">
+</p>
+
+<p align="center">
+  <img src="docs/images/app-conversation.png" alt="xMonkey running a real task on a local model: tool calls, thinking, and the answer" width="840">
 </p>
 
 | | command | what it is |
@@ -76,7 +80,7 @@ could show but not start.
 ## Why
 
 <p align="center">
-  <img src="docs/images/app-approval.png" alt="The permission dialog before a mutating tool runs" width="700">
+  <img src="docs/images/app-approval.png" alt="The approval dialog shown before a mutating tool runs" width="720">
 </p>
 
 

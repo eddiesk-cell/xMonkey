@@ -55,13 +55,16 @@ process.env.XMONKEY_VERSION = app.getVersion();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 800,
-    minWidth: 720,
-    minHeight: 520,
+    width: 1240,
+    height: 860,
+    minWidth: 760,
+    minHeight: 560,
     title: 'xMonkey',
+    // hiddenInset keeps the macOS traffic lights, floating over our sidebar the
+    // way they do in Claude Desktop. The sidebar reserves space for them.
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14161a' : '#f6f7f9',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 15, y: 18 } : undefined,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f1e1b' : '#f5f4ed',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -286,6 +289,7 @@ function registerIpc() {
 function askRenderer(req) {
   return new Promise((resolve) => {
     const id = `ask_${++approvalSeq}`;
+    console.log(`[approval] requesting: ${req.tool} — ${String(req.reason ?? '').slice(0, 80)}`);
     if (!mainWindow || mainWindow.isDestroyed()) {
       resolve(false);
       return;
@@ -319,8 +323,9 @@ app.whenReady().then(() => {
 async function runSmoke() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
-    // Give the renderer time to probe models and paint a real state.
-    await wait(3500);
+    // Give the renderer time to probe models and paint a real state. The probe
+    // hits a live model server, so a cold Ollama can take a few seconds.
+    await wait(6000);
 
     if (SMOKE_CWD) {
       await mainWindow.webContents.executeJavaScript(
@@ -330,22 +335,39 @@ async function runSmoke() {
     if (SMOKE_ASK) {
       // Drive the renderer's own UI handlers so this exercises the real path,
       // not a side channel: start a session, type into the composer, press send.
+      // Click "Start" then WAIT until the session is actually live before typing.
+      // Racing this sent the prompt into an empty session and the turn was silently
+      // dropped, which is what made the first screenshot show no conversation.
       await mainWindow.webContents.executeJavaScript(`(async () => {
         const use = document.querySelector('.model-row');
         if (use) use.click();
-        await new Promise(r => setTimeout(r, 2500));
+        const deadline = Date.now() + 60000;
+        while (Date.now() < deadline) {
+          const ready = window.__xmSessionReady && window.__xmSessionReady();
+          if (ready) break;
+          await new Promise(r => setTimeout(r, 200));
+        }
+      })()`);
+      await mainWindow.webContents.executeJavaScript(`(() => {
         const input = document.getElementById('input');
         input.value = ${JSON.stringify(SMOKE_ASK)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('send').click();
       })()`);
       // Wait for the turn to finish (composer unlock), bounded.
-      const deadline = Date.now() + 180_000;
+      const deadline = Date.now() + 300_000;
+      let lastReport = 0;
       for (;;) {
         const st = await mainWindow.webContents.executeJavaScript(`(() => ({
           busy: document.getElementById('stop').classList.contains('hidden') === false,
           thread: document.getElementById('thread').children.length,
+          text: (document.querySelector('.prose')?.textContent ?? '').slice(-120),
         }))()`);
         if (!st.busy && st.thread > 0) break;
+        if (Date.now() - lastReport > 15000) {
+          console.log('[smoke] still working; tail:', JSON.stringify(st.text));
+          lastReport = Date.now();
+        }
         if (Date.now() > deadline) { console.error('[smoke] turn did not finish in time'); break; }
         await wait(1000);
       }
@@ -384,7 +406,12 @@ async function runSmoke() {
     const state = await mainWindow.webContents.executeJavaScript(`(() => ({
       ready: document.readyState,
       hasApi: typeof window.xmonkey === 'object',
-      welcomeVisible: !document.getElementById('welcome')?.classList.contains('hidden'),
+      welcomeVisible: (() => {
+        const w = document.getElementById('welcome');
+        if (!w) return false;
+        const cs = getComputedStyle(w);
+        return cs.display !== 'none' && !w.classList.contains('hidden');
+      })(),
       welcomeText: document.getElementById('welcome-body')?.innerText?.slice(0, 300) ?? '',
       threadChildren: document.getElementById('thread')?.children.length ?? -1,
       bodyStart: document.body.innerText.slice(0, 200),
