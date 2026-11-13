@@ -1,0 +1,45 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # macOS because the desktop app's build tooling (iconutil, codesign) is
+    # macOS-only; the harness tests themselves are portable.
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Test the harness and the app layer
+        # The local-model integration test skips cleanly when no Ollama is
+        # present, so the suite is green on a clean runner.
+        run: node --test test/
+
+      - name: Build the desktop app
+        run: node tools/build-app.mjs
+
+      - name: Verify the app renders (screenshot + renderer state)
+        run: |
+          dist/xMonkey.app/Contents/MacOS/xMonkey --smoke=/tmp/app.png
+          test -s /tmp/app.png
+
+      - name: Upload the screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-smoke-${{ matrix.node }}
+          path: /tmp/app.png
+          if-no-files-found: warn
