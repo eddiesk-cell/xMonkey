@@ -1,0 +1,19 @@
+{
+  "name": "xmonkey",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "xMonkey — a model-agnostic coding agent harness. Bring your own model; local models first-class.",
+  "bin": {
+    "xmonkey": "./bin/xmonkey.mjs"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node bin/xmonkey.mjs",
+    "test": "node --test test/",
+    "test:local": "node --test test/e2e-local.test.mjs"
+  },
+  "license": "MIT"
+}

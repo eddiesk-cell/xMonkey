@@ -1,0 +1,14 @@
+# Reverse-engineering working material. Large (612 MB) and reproducible:
+#   .rea/app.asar           copied from /Applications/Claude.app
+#   .rea/extracted-app/     unpacked app.asar
+#   .rea/extracted-ion/     unpacked ion-dist.asar
+#   .rea/bun-extract/       $bunfs module payload from claude.exe
+#   research/claude-code/cli.js   the extracted harness JS (25 MB)
+# The findings that matter are committed in research/*.md and docs/EVIDENCE.md.
+.rea/
+research/claude-code/cli.js
+
+# Runtime state
+.xmonkey/
+node_modules/
+.DS_Store
