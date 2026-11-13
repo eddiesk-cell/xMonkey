@@ -71,3 +71,46 @@ record what was established and what was not (`docs/EVIDENCE.md`).
   them at runtime rather than pretending they work.
 - **Not examined**: the Cowork VM image and the native addon. Anything they do is
   unknown, not matched.
+
+## The REA workflow (this is the important part)
+
+The original build treated REA as a tool *for me*: I ran it, read the output, and
+wrote xMonkey by hand. That is not the workflow that makes a harness useful.
+
+The workflow is: **plug REA into the agent as tools, so the agent investigates and
+builds by itself.**
+
+xMonkey now does that. `xmonkey.config.json` registers REA as an MCP server:
+
+```json
+"mcpServers": {
+  "rea": {
+    "command": "npx",
+    "args": ["-y", "rea-agents@6.9.0", "mcp"],
+    "env": { "REA_MCP_TOOL_FAMILIES": "direct,enhanced,native,electron,application,session" }
+  }
+}
+```
+
+Verified end to end: given "use tool_search, then tool_call to run
+inspect_binary_hardening on /bin/ls", the agent searched, found the tool, called
+it, and reported the real PIE/NX state for **both** the x86_64 and arm64 slices.
+
+### The bug this exposed
+
+Advertising REA's full surface cost **96,657 tokens of tool schemas** — more than
+a 32k local model's entire context, so every request failed with
+`exceeds the available context size`.
+
+Three fixes, in order of impact:
+
+1. **Deferred tool discovery** (`src/tools/discovery.mjs`). Advertise a small core
+   set plus `tool_search` and `tool_call`; schemas arrive only when needed, and a
+   found tool is promoted for the rest of the session. 96,657 → **1,605 tokens**.
+2. **Tool-family scoping** on the REA registration (158 of 255 tools).
+3. **The system prompt listed every tool name** — 182 names, thousands of tokens,
+   duplicating what the schemas already say. It now lists the core set only.
+
+Also fixed: `bin/xmonkey.mjs` had its own duplicate tool setup and never received
+discovery at all; and a tool call could hang a turn forever, so `tool_call` now
+has a hard timeout that surfaces as an error the model can react to.

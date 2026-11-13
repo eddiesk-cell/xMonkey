@@ -24,6 +24,7 @@ import { loadSkills, renderSkillCatalogue, skillTool } from '../ext/skills.mjs';
 import { connectMcpServers } from '../ext/mcp.mjs';
 import { runHooks, fireHook, hasHooks } from '../ext/hooks.mjs';
 import { subagentTool } from '../ext/subagent.mjs';
+import { createToolSearcher, shouldDefer } from '../tools/discovery.mjs';
 import { describeConfig } from '../config.mjs';
 
 const LOCAL_KINDS = new Set(['ollama', 'lmstudio', 'llama.cpp', 'vllm']);
@@ -120,6 +121,13 @@ export async function createSession(opts = {}) {
     workspace: cwd,
   }));
 
+  // Tool discovery: register tool_search/tool_call and decide whether the
+  // advertised list must be deferred for this model's context window.
+  const searcher = createToolSearcher(tools);
+  tools.register(searcher.search);
+  tools.register(searcher.call);
+  const deferTools = shouldDefer(tools, provider.capabilities?.contextWindow ?? 32768, 4000);
+
   const hooks = hasHooks(cfg.hooks) ? cfg.hooks : undefined;
 
   // ---- memory + prompt ----------------------------------------------------
@@ -145,7 +153,9 @@ export async function createSession(opts = {}) {
     model: provider.model,
     providerId: provider.id,
     permissionMode: mode,
-    toolNames: tools.names(),
+    toolNames: (deferTools
+      ? ['core tools plus tool_search/tool_call']
+      : tools.names()),
     memory: memory.map((m) => `### ${m.path}\n${m.text}`).join('\n\n'),
     extra: [renderSkillCatalogue(skills), hookContext].filter(Boolean).join('\n\n') || undefined,
     local,
@@ -176,6 +186,8 @@ export async function createSession(opts = {}) {
     mcpServers: mcpClients.map((c) => ({ name: c.name, tools: c.tools.length })),
     mcpErrors,
     configSummary: describeConfig(cfg),
+    toolCount: tools.names().length,
+    deferredTools: deferTools,
     model: { name: selected, model: provider.model, kind: entry.kind, providerId: provider.id },
     capabilities: provider.capabilities,
     models: Object.entries(cfg.models).map(([name, m]) => ({ name, kind: m.kind, model: m.model, baseUrl: m.baseUrl })),
@@ -212,6 +224,8 @@ export async function createSession(opts = {}) {
         const out = await runAgent({
           provider,
           tools,
+          searcher,
+          deferTools,
           messages: history,
           system,
           maxTurns: cfg.loop.maxTurns,

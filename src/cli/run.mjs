@@ -16,6 +16,7 @@ import fs from 'node:fs/promises';
 import { loadConfig, describeConfig, EXAMPLE_CONFIG } from '../config.mjs';
 import { buildProvider, probeAll } from '../models/registry.mjs';
 import { buildDefaultRegistry, createTodoStore } from '../tools/index.mjs';
+import { createToolSearcher, shouldDefer } from '../tools/discovery.mjs';
 import { runAgent } from '../core/loop.mjs';
 import { buildSystemPrompt, loadMemory } from '../core/prompt.mjs';
 import { SessionStore, resolveSessionId, listSessions } from '../sessions/store.mjs';
@@ -167,6 +168,11 @@ export async function main(argv) {
   };
   const tools = buildDefaultRegistry(toolCtx);
 
+  // Deferred tool discovery: without it, an MCP server like REA advertises ~60k
+  // tokens of schemas and a local model's request fails outright.
+  let searcher = null;
+  let deferTools = false;
+
   // ---- extensions: skills, MCP servers, subagents, hooks ----
   const skills = await loadSkills(cwd);
   if (skills.length) tools.register(skillTool(async () => skills));
@@ -194,6 +200,10 @@ export async function main(argv) {
     depth: 0,
   }));
 
+  searcher = createToolSearcher(tools);
+  tools.register(searcher.search);
+  tools.register(searcher.call);
+  deferTools = shouldDefer(tools, provider.capabilities?.contextWindow ?? 32768, 4000);
   const hooks = cfg.hooks && hasHooks(cfg.hooks) ? cfg.hooks : undefined;
 
   const system = buildSystemPrompt({
@@ -208,6 +218,11 @@ export async function main(argv) {
   });
 
   const oneShot = flags.print === true;
+
+  if (!oneShot) {
+    process.stdout.write(`  ${symbols.info} ${c.grey(`${tools.names().length} tools` +
+      (deferTools ? ' (deferred: tool_search/tool_call)' : ''))}\n\n`);
+  }
 
   if (!oneShot) {
     banner(`${provider.model} ${c.grey(`(${provider.id})`)}${local ? c.grey(' · local') : ''}`, cwd, permissionMode);
@@ -238,6 +253,7 @@ export async function main(argv) {
     provider, tools, system, store, history, permissionMode, cfg, flags,
     oneShot, verbose: !!flags.verbose, todoStore,
     hooks, skills, mcpClients, cwd,
+    searcher, deferTools,
   };
 
   if (hooks) {
@@ -453,7 +469,7 @@ async function runOneShot(session, promptText) {
     process.stderr.write(`${symbols.fail} --print needs a prompt: xmonkey -p "your question"\n`);
     return 2;
   }
-  const { provider, tools, system, store, history, permissionMode } = session;
+  const { provider, tools, system, store, history, permissionMode, searcher, deferTools } = session;
   history.push({ role: 'user', content: [{ type: 'text', text: promptText }] });
   await store.append({ kind: 'user', content: promptText });
 
@@ -464,7 +480,7 @@ async function runOneShot(session, promptText) {
   try {
     const persistFrom = history.length;
     const out = await runAgent({
-      provider, tools, messages: history, system,
+      provider, tools, searcher, deferTools, messages: history, system,
       permissions: { mode: permissionMode, rules: session.cfg.permissions.rules ?? [], hooks: session.hooks, cwd: session.cwd },
       maxTurns: session.cfg.loop.maxTurns,
       signal: ac.signal,
@@ -487,7 +503,8 @@ async function runOneShot(session, promptText) {
 }
 
 async function runInteractive(session, initial) {
-  const { provider, tools, system, store, history, permissionMode, todoStore, skills } = session;
+  const { provider, tools, system, store, history, permissionMode, todoStore, skills,
+    searcher, deferTools } = session;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY });
   readline.emitKeypressEvents(process.stdin, rl);
 
@@ -548,7 +565,7 @@ async function runInteractive(session, initial) {
     const persistFrom = history.length;
     try {
       const out = await runAgent({
-        provider, tools, messages: history, system,
+        provider, tools, searcher, deferTools, messages: history, system,
         permissions: { mode: permissionMode, rules: session.cfg.permissions.rules ?? [], hooks: session.hooks, cwd: session.cwd },
         maxTurns: session.cfg.loop.maxTurns,
         signal: aborter.signal,

@@ -18,6 +18,7 @@
 import { estimateMessages, estimateTokens, newId } from './types.mjs';
 import { decide, denialMessage } from '../permissions/gate.mjs';
 import { runHooks, fireHook } from '../ext/hooks.mjs';
+import { advertisedSpecs } from '../tools/discovery.mjs';
 import { clipOutput } from '../tools/registry.mjs';
 
 export const STOP = {
@@ -102,7 +103,10 @@ export async function runAgent(opts) {
       completion = await provider.complete({
         system,
         messages,
-        tools: tools.specs(),
+        // Deferred tool discovery: when the catalogue is large relative to the
+        // model's window, advertise the core set and let tool_search reach the
+        // rest. Passing every schema would exceed a small model's context.
+        tools: advertisedSpecs(tools, opts.searcher ?? { promotedNames: () => [] }, { defer: !!opts.deferTools }),
         maxTokens,
         signal,
         onText: (chunk) => onEvent({ type: 'text', text: chunk }),
