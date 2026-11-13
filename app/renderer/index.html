@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none';" />
+<title>xMonkey</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- title bar (macOS traffic lights sit at the left) -->
+  <header id="titlebar">
+    <div class="tb-left">
+      <span class="logo" aria-hidden="true">🐒</span>
+      <span class="app-name">xMonkey</span>
+      <span id="session-badge" class="badge hidden"></span>
+    </div>
+    <div class="tb-center">
+      <button id="folder-btn" class="crumb" title="Choose project folder (⌘O)">
+        <span id="cwd-label">no folder</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="tb-right">
+      <button id="model-btn" class="pill" title="Change model">model</button>
+      <button id="mode-btn" class="pill" title="Change permission mode">mode</button>
+      <button id="new-btn" class="icon-btn" title="New session (⌘N)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="status-strip" class="hidden"></div>
+
+  <main id="thread" aria-live="polite"></main>
+
+  <footer id="composer-wrap">
+    <div id="composer">
+      <textarea id="input" rows="1" placeholder="Ask xMonkey to build, fix, explain…" spellcheck="false"></textarea>
+      <button id="send" class="send-btn" title="Send (⏎)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+      <button id="stop" class="stop-btn hidden" title="Stop (⌘.)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+      </button>
+    </div>
+    <div id="composer-hint">
+      <span id="hint-mode"></span>
+      <span class="sep">·</span>
+      <span>⏎ send</span><span class="sep">·</span><span>⇧⏎ newline</span>
+    </div>
+  </footer>
+
+  <!-- first-run / no-model screen -->
+  <div id="welcome" class="overlay">
+    <div class="welcome-card">
+      <div class="welcome-mark">🐒</div>
+      <h1>xMonkey</h1>
+      <p class="sub">A coding agent on any model — including the one running on this machine.</p>
+      <div id="welcome-body">
+        <div class="checking"><span class="spinner"></span> Looking for a local model…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- permission dialog -->
+  <div id="perm" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="perm-title">
+    <div class="perm-card">
+      <h2 id="perm-title">Approve this action?</h2>
+      <div id="perm-tool" class="perm-tool"></div>
+      <div id="perm-detail" class="perm-detail"></div>
+      <div class="perm-actions">
+        <button id="perm-deny" class="btn ghost">Deny</button>
+        <button id="perm-allow" class="btn primary">Allow once</button>
+      </div>
+      <div class="perm-hint">⏎ allow · esc deny</div>
+    </div>
+  </div>
+
+  <!-- model / mode picker -->
+  <div id="picker" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="picker-card">
+      <div class="picker-head">
+        <h2 id="picker-title">Choose a model</h2>
+        <button id="picker-close" class="icon-btn">✕</button>
+      </div>
+      <div id="picker-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>

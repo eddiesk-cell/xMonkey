@@ -1,4 +1,4 @@
-# Reverse-engineering working material. Large (612 MB) and reproducible:
+# Reverse-engineering working material. Large (~612 MB) and reproducible:
 #   .rea/app.asar           copied from /Applications/Claude.app
 #   .rea/extracted-app/     unpacked app.asar
 #   .rea/extracted-ion/     unpacked ion-dist.asar
@@ -8,7 +8,11 @@
 .rea/
 research/claude-code/cli.js
 
-# Runtime state
-.xmonkey/
+# Not committed:
+#   node_modules/  Electron runtime (~260 MB), installed with `npm install`
+#   dist/          the built .app (~260 MB), built with `npm run app:build`
+#   .xmonkey/      local session transcripts
 node_modules/
+dist/
+.xmonkey/
 .DS_Store

@@ -12,12 +12,73 @@ first-class, not a fallback.
 $ xmonkey "the parser drops trailing commas, fix it and add a test"
 ```
 
-**Status:** working. 108 tests pass, including integration tests against a real
-Ollama model running on this machine.
+**Status:** working. 130 tests pass, including integration tests against a real
+Ollama model running on this machine. Ships as **both** a CLI and a desktop app.
+
+## Two ways to run it
+
+<p align="center">
+  <img src="docs/images/app-conversation.png" alt="xMonkey desktop app running a real task on a local model" width="820">
+</p>
+
+| | command | what it is |
+|---|---|---|
+| **Desktop app** | double-click `xMonkey.app` | native window, conversation, tool cards, approval dialogs |
+| **CLI** | `xmonkey` | terminal, `--print` for scripting, sessions, resume |
+
+Both drive the *same* agent (`src/app/session.mjs` → `src/core/loop.mjs`). The app
+is a renderer of the event stream, not a second implementation — so a fix in the
+loop reaches both, and the two cannot drift apart.
+
+### Building the desktop app
+
+```bash
+npm install              # once, for Electron
+npm run app:build        # -> dist/xMonkey.app
+npm run app:dist         # -> also copies to /Applications
+open dist/xMonkey.app
+```
+
+The packager is `tools/build-app.mjs`: it copies the local Electron runtime,
+rewrites the bundle identity, installs the generated icon and ad-hoc signs the
+result. No network, no extra toolchain.
+
+**The icon is generated, not a binary blob** — `node tools/make-icon.mjs` draws
+the monkey mark in pure Node (zlib PNG writer + a tiny rasteriser) and builds the
+`.icns` with the system `iconutil`. Rebuilding always produces the same icon.
+
+### Verifying the app without clicking
+
+The app can test itself, which is how its UI was verified while building it:
+
+```bash
+# screenshot the welcome screen
+dist/xMonkey.app/Contents/MacOS/xMonkey --smoke=/tmp/shot.png
+
+# drive a real turn in a real project, then screenshot
+dist/xMonkey.app/Contents/MacOS/xMonkey \
+  --smoke=/tmp/shot.png\&cwd=/path/to/project\&ask=Read%20package.json%20and%20summarise%20it
+
+# also capture the approval dialog (it is left on screen, then answered)
+... \&perm
+
+# answer the dialog with Deny instead, to prove the refusal path
+... \&deny
+```
+
+`--smoke` prints the renderer's state as JSON (API present, errors, thread
+length) and exits non-zero if the window fails to render. That is what caught the
+packaged-bundle bugs: a wrong resource path and an auto-detected model the app
+could show but not start.
 
 ---
 
 ## Why
+
+<p align="center">
+  <img src="docs/images/app-approval.png" alt="The permission dialog before a mutating tool runs" width="700">
+</p>
+
 
 Frontier coding agents are excellent and tied to one vendor. Local models are
 getting good enough to drive tools, but most harnesses treat them as a
