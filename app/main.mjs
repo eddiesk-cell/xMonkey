@@ -28,6 +28,16 @@ const ROOT = path.resolve(__dirname, '..');
 // caught the first time.
 const RES = app.isPackaged ? path.join(process.resourcesPath, 'app') : ROOT;
 
+// The app ships a model roster next to its source: the fallback config for any
+// folder that has none, so switching projects never silently changes which
+// models exist. A project's own xmonkey.config.json still wins when present.
+if (!process.env.XMONKEY_CONFIG) {
+  const bundled = path.join(RES, 'xmonkey.config.json');
+  try {
+    if (fsSync.existsSync(bundled)) process.env.XMONKEY_CONFIG = bundled;
+  } catch { /* non-fatal */ }
+}
+
 let mainWindow = null;
 /** @type {any} */
 let session = null;

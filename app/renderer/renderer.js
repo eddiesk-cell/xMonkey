@@ -99,8 +99,9 @@ async function firstRun() {
     ui.modelConfig = probe.selectedConfig;
     // Reflect the detected model in the chrome immediately, so "Choose a model"
     // is not shown while a model is already available.
-    $('model-name').textContent = probe.selectedConfig.model;
-    $('composer-model').textContent = probe.selectedConfig.model;
+    const lbl = modelLabel({ name: probe.selected, model: probe.selectedConfig.model });
+    $('model-name').textContent = lbl;
+    $('composer-model').textContent = lbl;
   }
 
   const live = (probe.results ?? []).filter((r) => r.ok);
@@ -191,11 +192,12 @@ async function startSession(modelName) {
   ui.capabilities = r.capabilities ?? {};
   ui.configSummary = r.configSummary ?? '';
 
-  $('model-name').textContent = r.model.model;
+  const label = modelLabel(r.model);
+  $('model-name').textContent = label;
   $('model-btn').classList.add('accent');
   $('mode-name').textContent = MODE_LABEL[r.mode] ?? r.mode;
   $('mode-btn').classList.toggle('warn', r.mode === 'bypass');
-  $('composer-model').textContent = r.model.model;
+  $('composer-model').textContent = label;
 
   clearThread();
   renderGreeting();
@@ -223,6 +225,16 @@ function showWelcome() {
   const w = $('welcome');
   w.classList.remove('hidden');
   w.style.display = '';
+}
+
+/** "qwen-uncensored · qwen3.8-27b-abliterated" — alias first, clean model id. */
+function modelLabel(model) {
+  if (!model) return 'model';
+  const id = String(model.model ?? '').replace(/:latest$/, '');
+  if (model.name && model.name !== id && !model.name.startsWith('auto-')) {
+    return `${model.name} · ${id}`;
+  }
+  return id;
 }
 
 function setStatus(notes) {

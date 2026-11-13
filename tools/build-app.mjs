@@ -70,7 +70,7 @@ log('installing xMonkey source into the bundle');
 const appDir = path.join(res, 'app');
 fs.mkdirSync(appDir, { recursive: true });
 
-const INCLUDE = ['app', 'src', 'bin', 'package.json', 'LICENSE', 'README.md'];
+const INCLUDE = ['app', 'src', 'bin', 'package.json', 'LICENSE', 'README.md', 'xmonkey.config.json'];
 // app/assets/fonts is git-ignored (Anthropic's proprietary faces) but MUST be in
 // the bundle, or the UI silently falls back to Georgia and stops matching.
 const FONT_DIR = path.join(ROOT, 'app', 'assets', 'fonts');

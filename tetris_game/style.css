@@ -1,0 +1,38 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #111;
+    font-family: 'Arial', sans-serif;
+}
+
+#ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    z-index: 10;
+}
+
+#score {
+    font-size: 24px;
+}
+
+#game-over {
+    display: none;
+    font-size: 48px;
+    color: red;
+    margin-top: 10px;
+}
+
+#instructions {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    color: white;
+    z-index: 10;
+}
+
+canvas {
+    display: block;
+}
