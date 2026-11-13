@@ -56,6 +56,12 @@ const SMOKE_AUTO = SMOKE?.includes('&auto') ?? false;
 // `&cwd=/path` lets a test point the window at a real project.
 const SMOKE_CWD = SMOKE?.includes('&cwd=') ? decodeURIComponent(SMOKE.split('&cwd=')[1].split('&')[0]) : null;
 // `&perm` keeps the approval dialog on screen for the screenshot, then allows it.
+/** `&w=1440&h=900` forces the window size, for side-by-side parity captures. */
+const SMOKE_SIZE = (() => {
+  const w = SMOKE?.match(/&w=(\d+)/);
+  const h = SMOKE?.match(/&h=(\d+)/);
+  return { w: w ? Number(w[1]) : null, h: h ? Number(h[1]) : null };
+})();
 const SMOKE_PERM = SMOKE?.includes('&perm') ?? false;
 // `&views` exercises the auxiliary panels (projects/skills/connectors).
 const SMOKE_VIEWS = SMOKE?.includes('&views') ?? false;
@@ -69,8 +75,8 @@ process.env.XMONKEY_VERSION = app.getVersion();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1240,
-    height: 860,
+    width: SMOKE_SIZE.w || 1240,
+    height: SMOKE_SIZE.h || 860,
     minWidth: 760,
     minHeight: 560,
     title: 'xMonkey',
@@ -443,13 +449,21 @@ app.whenReady().then(() => {
 
 async function runSmoke() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const evalJs = async (label, code) => {
+    try {
+      return await mainWindow.webContents.executeJavaScript(code);
+    } catch (err) {
+      console.error(`[smoke] step failed: ${label}: ${err.message}`);
+      throw err;
+    }
+  };
   try {
     // Give the renderer time to probe models and paint a real state. The probe
     // hits a live model server, so a cold Ollama can take a few seconds.
     await wait(6000);
 
     if (SMOKE_CWD) {
-      await mainWindow.webContents.executeJavaScript(
+      await evalJs('set-cwd',
         `(() => { const fn = window.__xmSetCwd; if (fn) fn(${JSON.stringify(SMOKE_CWD)}); })()`);
     }
 
@@ -524,7 +538,7 @@ async function runSmoke() {
       for (const v of ['projects', 'skills', 'connectors']) {
         try {
           await mainWindow.webContents.executeJavaScript(
-            `document.querySelector('.sb-nav-item[data-view="${v}"]').click()`);
+            `(document.querySelector('.sb-row[data-view="${v}"]') || {click(){}}).click()`);
           await wait(700);
           viewReports[v] = await mainWindow.webContents.executeJavaScript(
             `(() => { const el = document.getElementById('view-${v}'); return el && !el.classList.contains('hidden') ? document.getElementById('${v}-body').innerText.slice(0,80) : 'NOT SHOWN'; })()`);
@@ -533,24 +547,31 @@ async function runSmoke() {
         }
       }
       await mainWindow.webContents.executeJavaScript(
-        `document.querySelector('.sb-nav-item[data-view="chat"]').click()`);
+        `(document.querySelector('.sb-row[data-view="chat"]') || {click(){}}).click();`);
       console.log('[smoke] views', JSON.stringify(viewReports));
 
 
     }
 
-    const viewState = await mainWindow.webContents.executeJavaScript(`(() => {
-      const t = document.getElementById('thread');
-      const cs = getComputedStyle(t);
-      return {
-        active: [...document.querySelectorAll('.sb-nav-item')].filter(e => e.classList.contains('active')).map(e => e.dataset.view),
-        hidden: [...document.querySelectorAll('.view')].map(e => e.id + ':' + (e.classList.contains('hidden') ? 'hidden' : 'SHOWN')),
-        threadDisplay: cs.display,
-        threadHeight: Math.round(t.getBoundingClientRect().height),
-        threadChildren: t.children.length,
-        threadEmptyClass: t.classList.contains('empty'),
-        welcomeDisplay: getComputedStyle(document.getElementById('welcome')).display,
-      };
+    const viewState = await evalJs('viewstate', `(() => {
+      try {
+        const t = document.getElementById('thread');
+        const cs = t ? getComputedStyle(t) : null;
+        const w = document.getElementById('welcome');
+        return {
+          active: [...document.querySelectorAll('.sb-row[data-view]')].filter(e => e.classList.contains('active')).map(e => e.dataset.view),
+          hidden: [...document.querySelectorAll('.view')].map(e => e.id + ':' + (e.classList.contains('hidden') ? 'hidden' : 'SHOWN')),
+          threadDisplay: cs ? cs.display : 'NO THREAD',
+          threadHeight: t ? Math.round(t.getBoundingClientRect().height) : -1,
+          threadChildren: t ? t.children.length : -1,
+          welcomeDisplay: w ? getComputedStyle(w).display : 'NO WELCOME',
+          welcomeRect: w ? JSON.stringify(w.getBoundingClientRect()) : '',
+          threadRect: t ? JSON.stringify(t.getBoundingClientRect()) : '',
+          bodyText: document.body.innerText.slice(0, 160),
+        };
+      } catch (e) {
+        return { PROBE_ERROR: String(e && e.message || e) };
+      }
     })()`);
     console.log('[smoke] viewstate', JSON.stringify(viewState));
 
@@ -563,7 +584,7 @@ async function runSmoke() {
     const size = (await fs.stat(SMOKE_OUT)).size;
     console.log(`[smoke] captured ${SMOKE_OUT} (${size} bytes)`);
     // Report what the renderer actually sees, so a blank window is detectable.
-    const state = await mainWindow.webContents.executeJavaScript(`(() => ({
+    const state = await mainWindow.webContents.executeJavaScript(`(() => { try { return ({
       ready: document.readyState,
       hasApi: typeof window.xmonkey === 'object',
       welcomeVisible: (() => {
@@ -577,7 +598,7 @@ async function runSmoke() {
       bodyStart: document.body.innerText.slice(0, 200),
       title: document.title,
       errors: window.__xmErrors ?? [],
-    }))()`);
+      }); } catch (e) { return { PROBE_ERROR: String(e && e.stack || e) }; } })()`);
     console.log('[smoke] state', JSON.stringify(state, null, 1));
     process.exitCode = 0;
   } catch (err) {

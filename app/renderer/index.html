@@ -10,60 +10,55 @@
 <body>
 <div id="shell">
 
-  <!-- ============================== sidebar ============================== -->
+  <!-- sidebar — measured from Claude Desktop: 242px wide -->
   <aside id="sidebar">
     <div class="sb-top">
       <button id="sb-collapse" class="sb-icon" title="Toggle sidebar (⌘\)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
       </button>
-      <span class="sb-wordmark">xMonkey</span>
-      <button id="sb-new" class="sb-icon" title="New chat (⌘N)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
+      <div class="sb-arrows">
+        <button class="sb-arrow" disabled aria-label="Back">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="sb-arrow" disabled aria-label="Forward">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
     </div>
 
-    <button id="sb-compose" class="sb-compose">
+    <button id="sb-new" class="sb-row">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      <span>New chat</span>
+      <span>New</span>
+    </button>
+    <button id="sb-search-row" class="sb-row">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span>Search</span>
+    </button>
+    <button class="sb-row" data-view="scheduled">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Scheduled</span>
+    </button>
+    <button class="sb-row" data-view="settings">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+      <span>Customize</span>
+    </button>
+    <button id="sb-more" class="sb-row">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+      <span>More</span>
     </button>
 
-    <nav class="sb-nav">
-      <button class="sb-nav-item" data-view="chat">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span>Chat</span>
+    <div class="sb-group" id="sb-pinned-group">
+      <button class="sb-group-head" data-toggle="pinned">
+        <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+        <span>Pinned</span>
       </button>
-      <button class="sb-nav-item" data-view="projects">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span>Projects</span>
-      </button>
-      <button class="sb-nav-item" data-view="skills">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 5.6L20 9.6l-4.4 3.6L17 19l-5-3-5 3 1.4-5.8L4 9.6l5.6-2z"/></svg>
-        <span>Skills</span>
-      </button>
-      <button class="sb-nav-item" data-view="scheduled">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <span>Scheduled</span>
-      </button>
-      <button class="sb-nav-item" data-view="artifacts">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M9 21V9"/></svg>
-        <span>Artifacts</span>
-      </button>
-      <button class="sb-nav-item" data-view="connectors">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg>
-        <span>Connectors</span>
-      </button>
-    </nav>
-
-    <div class="sb-section" id="sb-pinned-section">
-      <div class="sb-section-row">
-        <div class="sb-section-title">Pinned</div>
-      </div>
-      <div id="sb-pinned" class="sb-recents" style="flex:0 0 auto"></div>
+      <div id="sb-pinned" class="sb-list"></div>
     </div>
 
-    <div class="sb-section">
-      <div class="sb-section-row">
-        <div class="sb-section-title">Recents</div>
+    <div class="sb-group grow" id="sb-recents-group">
+      <div class="sb-group-head static">
+        <svg class="chev open" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+        <span>Recents</span>
         <button id="sb-search-btn" class="sb-mini" title="Search chats (⌘K)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         </button>
@@ -71,83 +66,27 @@
       <div id="sb-search-wrap" class="hidden">
         <input id="sb-search" type="search" placeholder="Search chats…" autocomplete="off" spellcheck="false" />
       </div>
-      <div id="sb-recents" class="sb-recents"></div>
+      <div id="sb-recents" class="sb-list grow"></div>
     </div>
 
-    <div class="sb-foot">
-      <button id="folder-btn" class="sb-folder" title="Choose project folder (⌘O)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span id="cwd-label" class="sb-cwd"></span>
-      </button>
-      <button id="customize-btn" class="sb-folder" title="Customize">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
-        <span>Customize</span>
-      </button>
-      <button id="settings-btn" class="sb-folder" title="Settings (⌘,)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
-        <span>Settings</span>
+    <div class="sb-account">
+      <button id="folder-btn" class="sb-account-btn" title="Choose project folder (⌘O)">
+        <span class="avatar" id="avatar">xm</span>
+        <span class="acct-text">
+          <span id="cwd-label" class="acct-name">xMonkey</span>
+          <span class="acct-plan">local workspace</span>
+        </span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
   </aside>
 
-  <!-- ============================== main ============================== -->
   <main id="main">
-    <header id="topbar">
-      <button id="sb-toggle-sm" class="sb-icon" title="Toggle sidebar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
-      </button>
-      <button id="model-btn" class="tb-pill" title="Change model">
-        <span id="model-name">Choose a model</span>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <button id="mode-btn" class="tb-pill" title="Permission mode">
-        <span id="mode-name">default</span>
-      </button>
-      <div class="tb-spacer"></div>
-      <button id="usage-btn" class="tb-usage" title="Token usage this session">
-        <span id="usage-label">0</span>
-        <span class="tb-usage-unit">tok</span>
-      </button>
-      <button id="new-btn" class="tb-ghost" title="New chat (⌘N)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
-    </header>
-
-    <div id="status-strip" class="hidden"></div>
-
-    <!-- chat view -->
-    <section id="view-chat" class="view">
-      <section id="thread" aria-live="polite"></section>
-      <footer id="composer-wrap">
-        <div id="attachments" class="attachments hidden"></div>
-        <div id="composer">
-          <textarea id="input" rows="1" placeholder="How can I help you today?" spellcheck="false"></textarea>
-          <div class="composer-row">
-            <div class="composer-left">
-              <button id="attach-btn" class="cb-icon" title="Attach files">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.5V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7"/><path d="M16 19h6M19 16v6"/></svg>
-              </button>
-              <span id="composer-model" class="cb-hint"></span>
-            </div>
-            <div class="composer-right">
-              <button id="stop" class="cb-stop hidden" title="Stop (⌘.)">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-              </button>
-              <button id="send" class="cb-send" title="Send (⏎)" disabled>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div id="composer-hint">xMonkey can make mistakes. Review changes before you commit.</div>
-      </footer>
-    </section>
-
-    <!-- auxiliary views -->
+    <!-- auxiliary panels -->
     <section id="view-projects" class="view panel-view hidden">
       <div class="panel">
         <h1 class="panel-title">Projects</h1>
-        <p class="panel-sub">Every folder you have worked in. Pick one to switch this window to it.</p>
+        <p class="panel-sub">Every folder you have worked in.</p>
         <div id="projects-body"></div>
       </div>
     </section>
@@ -155,15 +94,31 @@
     <section id="view-skills" class="view panel-view hidden">
       <div class="panel">
         <h1 class="panel-title">Skills</h1>
-        <p class="panel-sub">Instruction packs loaded into the agent when a task needs them. Invoke one with <code>/name</code>.</p>
+        <p class="panel-sub">Instruction packs loaded when a task needs them. Invoke with <code>/name</code>.</p>
         <div id="skills-body"></div>
+      </div>
+    </section>
+
+    <section id="view-connectors" class="view panel-view hidden">
+      <div class="panel">
+        <h1 class="panel-title">Connectors</h1>
+        <p class="panel-sub">MCP servers for this project. Tools appear as <code>mcp__server__tool</code>.</p>
+        <div id="connectors-body"></div>
+      </div>
+    </section>
+
+    <section id="view-artifacts" class="view panel-view hidden">
+      <div class="panel">
+        <h1 class="panel-title">Artifacts</h1>
+        <p class="panel-sub">Self-contained pages produced in this session.</p>
+        <div id="artifacts-body"></div>
       </div>
     </section>
 
     <section id="view-scheduled" class="view panel-view hidden">
       <div class="panel">
         <h1 class="panel-title">Scheduled</h1>
-        <p class="panel-sub">Runs a prompt in a project on a schedule, unattended. Each run appends to its history.</p>
+        <p class="panel-sub">Runs a prompt in a project on a schedule, unattended.</p>
         <div id="scheduled-body"></div>
         <div class="sched-form">
           <h3 class="sched-form-title">New schedule</h3>
@@ -182,25 +137,44 @@
       </div>
     </section>
 
-    <section id="view-artifacts" class="view panel-view hidden">
-      <div class="panel">
-        <h1 class="panel-title">Artifacts</h1>
-        <p class="panel-sub">Self-contained pages produced in this session. Click one to preview it.</p>
-        <div id="artifacts-body"></div>
-      </div>
-    </section>
+    <!-- chat view -->
+    <section id="view-chat" class="view">
+      <section id="thread" aria-live="polite"></section>
 
-    <section id="view-connectors" class="view panel-view hidden">
-      <div class="panel">
-        <h1 class="panel-title">Connectors</h1>
-        <p class="panel-sub">MCP servers configured for this project. Their tools appear to the agent as <code>mcp__server__tool</code>.</p>
-        <div id="connectors-body"></div>
-      </div>
+      <footer id="bottom">
+        <div id="attachments" class="attachments hidden"></div>
+        <div id="composer">
+          <button id="attach-btn" class="cb-plus" title="Attach files">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <textarea id="input" rows="1" placeholder="Type / for commands" spellcheck="false"></textarea>
+          <div class="cb-right">
+            <button id="stop" class="cb-icon hidden" title="Stop (⌘.)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+            </button>
+            <button id="send" class="cb-send" title="Send (⏎)" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="statusbar">
+          <button id="model-btn" class="st-model" title="Change model">
+            <span id="model-name">model</span>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <span class="st-sep"></span>
+          <span id="usage-label" class="st-usage">0 tok</span>
+          <span class="st-sep"></span>
+          <button id="mode-btn" class="st-mode" title="Permission mode">
+            <span id="mode-name">default</span>
+          </button>
+        </div>
+      </footer>
     </section>
   </main>
 </div>
 
-<!-- ============================== start screen ============================== -->
+<!-- start screen -->
 <div id="welcome" class="screen">
   <div class="welcome-inner">
     <div class="welcome-mark">
@@ -221,7 +195,7 @@
   </div>
 </div>
 
-<!-- ============================== approval dialog ============================== -->
+<!-- approval -->
 <div id="perm" class="modal-scrim hidden" role="dialog" aria-modal="true">
   <div class="modal perm-modal">
     <div class="modal-head">
@@ -234,10 +208,7 @@
       </div>
     </div>
     <div class="perm-body">
-      <div class="perm-row">
-        <span class="perm-label">Tool</span>
-        <code id="perm-tool"></code>
-      </div>
+      <div class="perm-row"><span class="perm-label">Tool</span><code id="perm-tool"></code></div>
       <pre id="perm-detail" class="perm-code"></pre>
     </div>
     <div class="modal-actions">
@@ -247,7 +218,7 @@
   </div>
 </div>
 
-<!-- ============================== question dialog ============================== -->
+<!-- question -->
 <div id="question" class="modal-scrim hidden" role="dialog" aria-modal="true">
   <div class="modal perm-modal">
     <div class="modal-head">
@@ -260,13 +231,28 @@
       <div id="question-options" class="question-options"></div>
       <input id="question-input" type="text" placeholder="Or type an answer…" autocomplete="off" />
     </div>
-    <div class="modal-actions">
-      <button id="question-submit" class="btn primary">Answer</button>
-    </div>
+    <div class="modal-actions"><button id="question-submit" class="btn primary">Answer</button></div>
   </div>
 </div>
 
-<!-- ============================== picker ============================== -->
+<!-- artifact preview -->
+<div id="artifact" class="modal-scrim hidden" role="dialog" aria-modal="true">
+  <div class="modal artifact-modal">
+    <div class="modal-head">
+      <div style="flex:1;min-width:0">
+        <h2 id="artifact-title">Artifact</h2>
+        <p class="modal-sub" id="artifact-sub"></p>
+      </div>
+      <button id="artifact-download" class="btn">Download</button>
+      <button id="artifact-close" class="btn ghost icon" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="artifact-frame-wrap"><iframe id="artifact-frame" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div>
+  </div>
+</div>
+
+<!-- picker -->
 <div id="picker" class="modal-scrim hidden" role="dialog" aria-modal="true">
   <div class="modal picker-modal">
     <div class="modal-head">
@@ -279,26 +265,7 @@
   </div>
 </div>
 
-<!-- ============================== artifact preview ============================== -->
-<div id="artifact" class="modal-scrim hidden" role="dialog" aria-modal="true">
-  <div class="modal artifact-modal">
-    <div class="modal-head">
-      <div style="flex:1;min-width:0">
-        <h2 id="artifact-title">Artifact</h2>
-        <p class="modal-sub" id="artifact-sub"></p>
-      </div>
-      <button id="artifact-download" class="btn" style="margin-left:auto">Download</button>
-      <button id="artifact-close" class="btn ghost icon" aria-label="Close">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="artifact-frame-wrap">
-      <iframe id="artifact-frame" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
-    </div>
-  </div>
-</div>
-
-<!-- ============================== settings ============================== -->
+<!-- settings -->
 <div id="settings" class="modal-scrim hidden" role="dialog" aria-modal="true">
   <div class="modal settings-modal">
     <div class="modal-head">

@@ -102,7 +102,6 @@ async function firstRun() {
     // is not shown while a model is already available.
     const lbl = modelLabel({ name: probe.selected, model: probe.selectedConfig.model });
     $('model-name').textContent = lbl;
-    $('composer-model').textContent = lbl;
   }
 
   const live = (probe.results ?? []).filter((r) => r.ok);
@@ -131,9 +130,9 @@ async function firstRun() {
   }
 
   const isEmbedding = (m) => /embed|nomic|minilm|rerank|bge|e5-/i.test(m);
-  const rows = live.map((r) => {
+  const rows = live.filter((r) => r.name === probe.selected).map((r) => {
     const chat = (r.models ?? []).filter((m) => !isEmbedding(m));
-    const isSel = r.name === probe.selected;
+    const isSel = true;
     const title = isSel ? (probe.selectedConfig?.model ?? r.name) : r.name;
     return `<button class="model-row" data-model="${esc(r.name)}">
       <span class="dot ok"></span>
@@ -198,7 +197,7 @@ async function startSession(modelName) {
   $('model-btn').classList.add('accent');
   $('mode-name').textContent = MODE_LABEL[r.mode] ?? r.mode;
   $('mode-btn').classList.toggle('warn', r.mode === 'bypass');
-  $('composer-model').textContent = label;
+
 
   clearThread();
   renderGreeting();
@@ -238,11 +237,11 @@ function modelLabel(model) {
   return id;
 }
 
+/** Session facts live in the status bar (model / usage / mode), so notes are
+    folded into the usage tooltip rather than a separate strip. */
 function setStatus(notes) {
-  const strip = $('status-strip');
-  if (!notes?.length) { strip.classList.add('hidden'); strip.innerHTML = ''; return; }
-  strip.classList.remove('hidden');
-  strip.innerHTML = `<span class="dot"></span>${esc(notes.join('  ·  '))}`;
+  const usage = $('usage-label');
+  if (usage) usage.title = notes?.join('  ·  ') ?? '';
 }
 
 // ---------------------------------------------------------------- events
@@ -465,8 +464,8 @@ function bumpUsage(u) {
   ui.usage.inputTokens += u.inputTokens ?? 0;
   ui.usage.outputTokens += u.outputTokens ?? 0;
   const total = ui.usage.inputTokens + ui.usage.outputTokens;
-  $('usage-label').textContent = total > 1000 ? (total / 1000).toFixed(1) + 'k' : String(total);
-  $('usage-btn').title = `${ui.usage.inputTokens} input · ${ui.usage.outputTokens} output tokens this session`;
+  $('usage-label').textContent = total > 1000 ? `${(total / 1000).toFixed(1)}k tok` : `${total} tok`;
+  $('usage-label').title = `${ui.usage.inputTokens} input · ${ui.usage.outputTokens} output tokens this session`;
 }
 
 function describeTool(name, input) {
@@ -585,39 +584,67 @@ function esc(s) {
 
 // ---------------------------------------------------------------- chrome
 
-function wireChrome() {
-  $('sb-new').onclick = () => startSession(ui.modelName);
-  $('sb-compose').onclick = () => { showWelcome(); firstRun(); };
-  $('new-btn').onclick = () => startSession(ui.modelName);
-  $('folder-btn').onclick = chooseFolder;
-  $('attach-btn').onclick = chooseFolder;
-  $('model-btn').onclick = openModelPicker;
-  $('mode-btn').onclick = openModePicker;
-  $('sb-collapse').onclick = toggleSidebar;
-  $('sb-toggle-sm').onclick = toggleSidebar;
+/** Bind a handler only if the element exists; a missing node is a bug, not a crash. */
+function on(id, event, fn) {
+  const el = $(id);
+  if (!el) { window.__xmErrors.push(`missing element #${id} (wiring skipped)`); return; }
+  el[event] = fn;
+}
 
-  for (const item of document.querySelectorAll('.sb-nav-item')) {
-    item.onclick = () => switchView(item.dataset.view || 'chat');
+function wireChrome() {
+  on('sb-new', 'onclick', () => { showWelcome(); firstRun(); });
+  on('sb-search-row', 'onclick', () => {
+    const wrap = $('sb-search-wrap');
+    if (!wrap) return;
+    wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')) $('sb-search').focus();
+  });
+  on('sb-more', 'onclick', () => switchView('connectors'));
+  on('folder-btn', 'onclick', chooseFolder);
+  on('attach-btn', 'onclick', chooseFolder);
+  on('model-btn', 'onclick', openModelPicker);
+  on('mode-btn', 'onclick', openModePicker);
+  on('sb-collapse', 'onclick', toggleSidebar);
+
+  // Navigation rows: settings opens the modal, everything else switches view.
+  for (const item of document.querySelectorAll('.sb-row[data-view]')) {
+    item.onclick = () => {
+      const v = item.dataset.view;
+      if (v === 'settings') { openSettings(); return; }
+      switchView(v);
+    };
   }
-  document.querySelector('.sb-nav-item[data-view="chat"]')?.classList.add('active');
+
+  // Collapsible sections, like Claude's Pinned / Recents groups.
+  for (const head of document.querySelectorAll('.sb-group-head[data-toggle]')) {
+    head.onclick = () => {
+      const list = head.parentElement.querySelector('.sb-list');
+      list.classList.toggle('collapsed');
+      head.querySelector('.chev').classList.toggle('open', !list.classList.contains('collapsed'));
+    };
+  }
 
   // ---- search
-  $('sb-search-btn').onclick = () => {
+  on('sb-search-btn', 'onclick', () => {
     const wrap = $('sb-search-wrap');
+    if (!wrap) return;
     wrap.classList.toggle('hidden');
     if (!wrap.classList.contains('hidden')) $('sb-search').focus();
     else { $('sb-search').value = ''; renderRecents(); }
-  };
-  $('sb-search').addEventListener('input', () => renderRecents());
-  $('sb-search').addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { $('sb-search').value = ''; $('sb-search-wrap').classList.add('hidden'); renderRecents(); }
   });
+  const search = $('sb-search');
+  if (search) {
+    search.addEventListener('input', () => renderRecents());
+    search.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      search.value = '';
+      $('sb-search-wrap').classList.add('hidden');
+      renderRecents();
+    });
+  }
 
   // ---- settings
-  $('settings-btn').onclick = openSettings;
-  $('customize-btn').onclick = openSettings;
-  $('settings-close').onclick = () => $('settings').classList.add('hidden');
-  $('usage-btn').onclick = openSettings;
+  on('settings-close', 'onclick', () => $('settings').classList.add('hidden'));
 
   // Remembered sidebar state.
   try {
@@ -635,11 +662,14 @@ function toggleSidebar() {
 function switchView(view) {
   ui.view = view;
   for (const el of document.querySelectorAll('.view')) el.classList.add('hidden');
-  for (const el of document.querySelectorAll('.sb-nav-item')) {
+  // Panels own the whole content area, so the start screen must step aside.
+  if (view !== 'chat') $('welcome').style.display = 'none';
+  for (const el of document.querySelectorAll('.sb-row[data-view]')) {
     el.classList.toggle('active', el.dataset.view === view);
   }
   $('welcome').classList.add('hidden');
 
+  if (view !== 'chat') $('welcome').classList.add('hidden');
   if (view === 'chat') {
     $('view-chat').classList.remove('hidden');
     // Returning to Chat must restore whatever state the thread should be in:
@@ -904,13 +934,13 @@ function togglePin(id) {
 
 function renderPinned(rows) {
   const box = $('sb-pinned');
-  const section = $('sb-pinned-section');
+  const section = $('sb-pinned-group');
   if (!rows?.length) { box.innerHTML = ''; section.style.display = 'none'; return; }
   section.style.display = '';
   box.innerHTML = '';
   for (const s of rows) {
     const el = document.createElement('button');
-    el.className = 'sb-pin';
+    el.className = 'sb-item';
     el.innerHTML = '<svg class="pin" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg><span class="t"></span>';
     el.querySelector('.t').textContent = String(s.id).slice(-8);
     el.title = s.cwd ?? '';
@@ -997,7 +1027,7 @@ async function renderRecents() {
   box.innerHTML = '';
   for (const s of rows.slice(0, 12)) {
     const el = document.createElement('button');
-    el.className = 'sb-recent';
+    el.className = 'sb-item';
     const when = new Date(s.mtime ?? Date.now());
     el.innerHTML = '<span class="title"></span><span class="when"></span>';
     el.querySelector('.title').textContent = sessionTitle(s);
@@ -1023,7 +1053,7 @@ async function resumeSession(id) {
   ui.models = start.models ?? [];
   ui.modelName = start.model.name;
   $('model-name').textContent = start.model.model;
-  $('composer-model').textContent = start.model.model;
+
   clearThread();
   renderGreeting();
   renderNotice(`Resumed ${start.id.slice(-4)} — ${start.resumedMessages} messages restored.`);
